@@ -23,6 +23,7 @@ import org.apache.kerby.kerberos.kerb.KrbException;
 import org.apache.kerby.kerberos.kerb.client.ClientUtil;
 import org.apache.kerby.kerberos.kerb.client.KrbSetting;
 import org.apache.kerby.kerberos.kerb.client.request.AsRequest;
+import org.apache.kerby.kerberos.kerb.client.request.KdcRequest;
 import org.apache.kerby.kerberos.kerb.client.request.TgsRequest;
 import org.apache.kerby.kerberos.kerb.transport.KrbNetwork;
 import org.apache.kerby.kerberos.kerb.transport.KrbTransport;
@@ -53,14 +54,23 @@ public class DefaultInternalKrbClient extends AbstractInternalKrbClient {
 
         this.krbHandler = new DefaultKrbHandler();
         krbHandler.init(getContext());
+    }
 
-        TransportPair tpair = ClientUtil.getTransportPair(getSetting());
-        KrbNetwork network = new KrbNetwork();
-        network.setSocketTimeout(getSetting().getTimeout());
+    private void doRequest(KdcRequest request) throws KrbException {
         try {
+            TransportPair tpair = ClientUtil.getTransportPair(getSetting());
+            KrbNetwork network = new KrbNetwork();
+
+            network.setSocketTimeout(getSetting().getTimeout());
+
             transport = network.connect(tpair);
+
+            request.setSessionData(transport);
+            krbHandler.handleRequest(request);
         } catch (IOException e) {
             throw new KrbException("Failed to create transport", e);
+        } finally {
+            transport.release();
         }
     }
 
@@ -69,11 +79,8 @@ public class DefaultInternalKrbClient extends AbstractInternalKrbClient {
      */
     @Override
     protected TgtTicket doRequestTgt(AsRequest tgtTktReq) throws KrbException {
-        tgtTktReq.setSessionData(transport);
+        doRequest(tgtTktReq);
 
-        krbHandler.handleRequest(tgtTktReq);
-
-        transport.release();
         return tgtTktReq.getTicket();
     }
 
@@ -82,11 +89,8 @@ public class DefaultInternalKrbClient extends AbstractInternalKrbClient {
      */
     @Override
     protected SgtTicket doRequestSgt(TgsRequest ticketReq) throws KrbException {
-        ticketReq.setSessionData(transport);
+        doRequest(ticketReq);
 
-        krbHandler.handleRequest(ticketReq);
-
-        transport.release();
         return ticketReq.getSgt();
     }
 
