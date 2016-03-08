@@ -135,6 +135,10 @@ public abstract class KrbHandler {
                 kdcRequest.resetPrequthContxt();
                 handleRequest(kdcRequest);
                 LOG.info("Retry with the new kdc request including pre-authentication.");
+            } else {
+                KrbErrorCode errorCode = error.getErrorCode();
+                String errorCodeMessage = errorCode.getMessage();
+                throw new KrbException(errorCode, errorCodeMessage);
             }
         }
     }
